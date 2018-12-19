@@ -167,8 +167,7 @@ class _DateTimePickerTextFormFieldState extends FormFieldState<DateTime> {
   }
 
   void inputChanged() {
-    final bool requiresInput = parent.controller.text.isEmpty &&
-        _previousValue.isEmpty &&
+    final bool requiresInput = 
         parent.focusNode.hasFocus;
 
     if (requiresInput) {
@@ -179,15 +178,7 @@ class _DateTimePickerTextFormFieldState extends FormFieldState<DateTime> {
       setState(() => showResetIcon = !showResetIcon);
       // parent.focusNode.unfocus();
     }
-    _previousValue = parent.controller.text;
-    if (!parent.focusNode.hasFocus) {
-      setValue(_toDate(_previousValue, parent.format));
-    } else if (!requiresInput && !parent.editable) {
-      var date = _toDate(_previousValue, parent.format);
-      getDateTimeInput(context, date ?? parent.initialDate,
-              _toTime(date) ?? parent.initialTime)
-          .then(_setValue);
-    }
+    
   }
 
   void _setValue(DateTime date) {
