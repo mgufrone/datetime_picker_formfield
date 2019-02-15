@@ -249,7 +249,7 @@ class _DateTimePickerTextFormFieldState extends FormFieldState<DateTime> {
       maxLines: parent.maxLines,
       maxLength: parent.maxLength,
       inputFormatters: parent.inputFormatters,
-      enabled: parent.enabled,
+      enabled: widget.enabled,
       onFieldSubmitted: (value) {
         if (parent.onFieldSubmitted != null) {
           return parent.onFieldSubmitted(_toDate(value, parent.format));
