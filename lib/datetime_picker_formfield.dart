@@ -3,10 +3,21 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:flutter/services.dart' show TextInputFormatter;
 
+enum InputType { date, time, both }
+
 /// A [FormField<DateTime>] that uses a [TextField] to manage input.
+///
+/// This widget can use Flutter's date and/or time pickers. The default is to
+/// show both pickers, but can be changed with the [inputType] parameter.
 class DateTimePickerFormField extends FormField<DateTime> {
+  /// The date/time picker dialogs to show.
+  final InputType inputType;
+
+  /// Deprecated. Use [inputType] instead.
+  ///
   /// Whether to show the time picker after a date has been chosen.
   /// To show the time picker only, use [TimePickerFormField].
+  @deprecated
   final bool dateOnly;
 
   /// Allow manual editing of the date/time. Defaults to true. If false, the
@@ -18,7 +29,9 @@ class DateTimePickerFormField extends FormField<DateTime> {
   /// (Sunday, June 3, 2018 at 9:24pm)
   final DateFormat format;
 
-  /// Where the calendar will start when shown. Defaults to the current date.
+  /// The date the calendar opens to when displayed. Defaults to the current date.
+  ///
+  /// To preset the widget's value, use [initialValue] instead.
   final DateTime initialDate;
 
   /// The earliest choosable date. Defaults to 1900.
@@ -31,7 +44,7 @@ class DateTimePickerFormField extends FormField<DateTime> {
   /// to noon. Explicitly set this to `null` to use the current time.
   final TimeOfDay initialTime;
 
-  /// If defined the TextField [decoration]'s [suffixIcon] will be
+  /// If defined, the TextField [decoration]'s [suffixIcon] will be
   /// overridden to reset the input using the icon defined here.
   /// Set this to `null` to stop that behavior. Defaults to [Icons.close].
   final IconData resetIcon;
@@ -49,6 +62,9 @@ class DateTimePickerFormField extends FormField<DateTime> {
   final DatePickerMode initialDatePickerMode;
 
   /// Corresponds to the [showDatePicker()] parameter.
+  ///
+  /// See [GlobalMaterialLocalizations](https://docs.flutter.io/flutter/flutter_localizations/GlobalMaterialLocalizations-class.html)
+  /// for acceptable values.
   final Locale locale;
 
   /// Corresponds to the [showDatePicker()] parameter.
@@ -67,6 +83,8 @@ class DateTimePickerFormField extends FormField<DateTime> {
   final TextInputType keyboardType;
   final TextStyle style;
   final TextAlign textAlign;
+
+  /// Preset the widget's value.
   final DateTime initialValue;
   final bool autofocus;
   final bool obscureText;
@@ -85,7 +103,8 @@ class DateTimePickerFormField extends FormField<DateTime> {
   DateTimePickerFormField({
     Key key,
     @required this.format,
-    this.dateOnly: false,
+    InputType inputType,
+    bool dateOnly,
     this.editable: true,
     this.onChanged,
     this.resetIcon: Icons.close,
@@ -120,6 +139,8 @@ class DateTimePickerFormField extends FormField<DateTime> {
     this.inputFormatters,
   })  : controller = controller ??
             TextEditingController(text: _toString(initialValue, format)),
+        inputType = inputType ?? (dateOnly ? InputType.date : InputType.both),
+        dateOnly = inputType == InputType.date,
         focusNode = focusNode ?? FocusNode(),
         initialDate = initialDate ?? DateTime.now(),
         firstDate = firstDate ?? DateTime(1900),
@@ -130,143 +151,177 @@ class DateTimePickerFormField extends FormField<DateTime> {
             autovalidate: autovalidate,
             validator: validator,
             onSaved: onSaved,
-            builder: (FormFieldState<DateTime> field) {
-              // final _DateTimePickerTextFormFieldState state = field;
-            });
+            builder: (FormFieldState<DateTime> field) {});
 
   @override
   _DateTimePickerTextFormFieldState createState() =>
-      _DateTimePickerTextFormFieldState(this);
+      _DateTimePickerTextFormFieldState();
 }
 
 class _DateTimePickerTextFormFieldState extends FormFieldState<DateTime> {
-  final DateTimePickerFormField parent;
   bool showResetIcon = false;
   String _previousValue = '';
 
-  _DateTimePickerTextFormFieldState(this.parent);
+  @override
+  DateTimePickerFormField get widget => super.widget;
+
+  _DateTimePickerTextFormFieldState();
 
   @override
   void setValue(DateTime value) {
     super.setValue(value);
-    if (parent.onChanged != null) parent.onChanged(value);
+
+    if (widget.onChanged != null) widget.onChanged(value);
   }
 
   @override
   void initState() {
     super.initState();
-    parent.focusNode.addListener(inputChanged);
-    parent.controller.addListener(inputChanged);
+    widget.focusNode.addListener(inputChanged);
+    widget.controller.addListener(inputChanged);
   }
 
   @override
   void dispose() {
-    parent.controller.removeListener(inputChanged);
-    parent.focusNode.removeListener(inputChanged);
+    widget.controller.removeListener(inputChanged);
+    widget.focusNode.removeListener(inputChanged);
     super.dispose();
   }
 
   void inputChanged() {
-    final bool requiresInput = 
+    final bool requiresInput =
         parent.focusNode.hasFocus;
 
     if (requiresInput) {
-      getDateTimeInput(context, parent.initialDate, parent.initialTime)
+      getDateTimeInput(context, widget.initialDate, widget.initialTime)
           .then(_setValue);
-    } else if (parent.resetIcon != null &&
-        parent.controller.text.isEmpty == showResetIcon) {
+    } else if (widget.resetIcon != null &&
+        widget.controller.text.isEmpty == showResetIcon) {
       setState(() => showResetIcon = !showResetIcon);
-      // parent.focusNode.unfocus();
+      // widget.focusNode.unfocus();
     }
-    
   }
 
   void _setValue(DateTime date) {
-    parent.focusNode.unfocus();
+    widget.focusNode.unfocus();
     // When Cancel is tapped, retain the previous value if present.
     if (date == null && _previousValue.isNotEmpty) {
-      date = _toDate(_previousValue, parent.format);
+      date = _toDate(_previousValue, widget.format);
     }
     setState(() {
-      parent.controller.text = _toString(date, parent.format);
+      widget.controller.text = _toString(date, widget.format);
       setValue(date);
     });
   }
 
   Future<DateTime> getDateTimeInput(
       BuildContext context, DateTime initialDate, TimeOfDay initialTime) async {
-    var date = await showDatePicker(
-        context: context,
-        firstDate: parent.firstDate,
-        lastDate: parent.lastDate,
-        initialDate: initialDate,
-        initialDatePickerMode: parent.initialDatePickerMode,
-        locale: parent.locale,
-        selectableDayPredicate: parent.selectableDayPredicate,
-        textDirection: parent.textDirection);
-    if (date != null) {
-      date = startOfDay(date);
-      if (!parent.dateOnly) {
-        final time = await showTimePicker(
+    Future<TimeOfDay> getTime() => showTimePicker(
           context: context,
           initialTime: initialTime ?? TimeOfDay.now(),
         );
-        if (time != null) {
-          date = date.add(Duration(hours: time.hour, minutes: time.minute));
+
+    if (widget.inputType != InputType.time) {
+      var date = await showDatePicker(
+          context: context,
+          firstDate: widget.firstDate,
+          lastDate: widget.lastDate,
+          initialDate: initialDate,
+          initialDatePickerMode: widget.initialDatePickerMode,
+          locale: widget.locale,
+          selectableDayPredicate: widget.selectableDayPredicate,
+          textDirection: widget.textDirection);
+      if (date != null) {
+        date = DateTime(date.year, date.month, date.day);
+        if (widget.inputType == InputType.both) {
+          final time = await getTime();
+          if (time != null) {
+            date = DateTime(
+                date.year, date.month, date.day, time.hour, time.minute);
+          }
         }
       }
+      return date;
+    } else {
+      // Get time only
+      final time = await getTime();
+      if (time == null) return null;
+      return DateTime(1, 1, 1, time.hour, time.minute);
     }
-
-    return date;
   }
 
   @override
   Widget build(BuildContext context) {
     return TextFormField(
-      controller: parent.controller,
-      focusNode: parent.focusNode,
-      decoration: parent.resetIcon == null
-          ? parent.decoration
-          : parent.decoration.copyWith(
+      controller: widget.controller,
+      focusNode: widget.focusNode,
+      decoration: widget.resetIcon == null
+          ? widget.decoration
+          : widget.decoration.copyWith(
               suffixIcon: showResetIcon
                   ? IconButton(
-                      icon: Icon(parent.resetIcon),
+                      icon: Icon(widget.resetIcon),
                       onPressed: () {
-                        parent.focusNode.unfocus();
+                        widget.focusNode.unfocus();
                         _previousValue = '';
-                        parent.controller.clear();
+                        widget.controller.clear();
                       },
                     )
                   : Container(width: 0.0, height: 0.0),
             ),
-      keyboardType: parent.keyboardType,
-      style: parent.style,
-      textAlign: parent.textAlign,
-      autofocus: parent.autofocus,
-      obscureText: parent.obscureText,
-      autocorrect: parent.autocorrect,
-      maxLengthEnforced: parent.maxLengthEnforced,
-      maxLines: parent.maxLines,
-      maxLength: parent.maxLength,
-      inputFormatters: parent.inputFormatters,
+      keyboardType: widget.keyboardType,
+      style: widget.style,
+      textAlign: widget.textAlign,
+      autofocus: widget.autofocus,
+      obscureText: widget.obscureText,
+      autocorrect: widget.autocorrect,
+      maxLengthEnforced: widget.maxLengthEnforced,
+      maxLines: widget.maxLines,
+      maxLength: widget.maxLength,
+      inputFormatters: widget.inputFormatters,
       enabled: widget.enabled,
       onFieldSubmitted: (value) {
-        if (parent.onFieldSubmitted != null) {
-          return parent.onFieldSubmitted(_toDate(value, parent.format));
+        if (widget.onFieldSubmitted != null) {
+          return widget.onFieldSubmitted(_toDate(value, widget.format));
         }
       },
       validator: (value) {
-        if (parent.validator != null) {
-          return parent.validator(_toDate(value, parent.format));
+        if (widget.validator != null) {
+          return widget.validator(_toDate(value, widget.format));
         }
       },
-      autovalidate: parent.autovalidate,
+      autovalidate: widget.autovalidate,
       onSaved: (value) {
-        if (parent.onSaved != null) {
-          return parent.onSaved(_toDate(value, parent.format));
+        if (widget.onSaved != null) {
+          return widget.onSaved(_toDate(value, widget.format));
         }
       },
     );
+  }
+
+  @override
+  void didUpdateWidget(DateTimePickerFormField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.controller != oldWidget.controller) {
+      print('controller changed');
+      oldWidget.controller.removeListener(inputChanged);
+      widget.controller.text = oldWidget.controller.text;
+      widget.controller.selection = oldWidget.controller.selection;
+      widget.controller.addListener(inputChanged);
+    }
+    if (widget.focusNode != oldWidget.focusNode) {
+      print('focusnode changed');
+      oldWidget.focusNode.removeListener(inputChanged);
+      widget.focusNode.addListener(inputChanged);
+    }
+
+    // Update text value if format is changed
+    if (widget.format != oldWidget.format) {
+      print('format changed');
+      widget.controller.removeListener(inputChanged);
+      widget.controller.text = _toString(value, widget.format);
+      widget.controller.addListener(inputChanged);
+    }
   }
 }
 
@@ -275,18 +330,18 @@ String _toString(DateTime date, DateFormat formatter) {
     try {
       return formatter.format(date);
     } catch (e) {
-      debugPrint('Error formatting date: $e');
+      print('Error formatting date: $e');
     }
   }
   return '';
 }
 
 DateTime _toDate(String string, DateFormat formatter) {
-  if (string != null && string.isNotEmpty) {
+  if (string?.isNotEmpty ?? false) {
     try {
       return formatter.parse(string);
     } catch (e) {
-      debugPrint('Error parsing date: $e');
+      print('Error parsing date: $e');
     }
   }
   return null;
@@ -297,5 +352,3 @@ TimeOfDay _toTime(DateTime date) {
   if (date == null) return null;
   return TimeOfDay.fromDateTime(date);
 }
-
-DateTime startOfDay(DateTime date) => DateTime(date.year, date.month, date.day);
